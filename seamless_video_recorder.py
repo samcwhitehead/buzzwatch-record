@@ -61,14 +61,16 @@ class SeamlessVideoRecorder:
         self.last_transfer_time = time.time()
 
         # Setup logging
+        self.log_path = self.local_storage_path / Path('video_recorder.log')
         logging.basicConfig(
             level=logging.INFO,
             format='%(asctime)s - %(levelname)s - %(message)s',
             handlers=[
-                logging.FileHandler('/home/pi/seamless_video_recorder.log'),
+                logging.FileHandler(self.log_path),
                 logging.StreamHandler()
             ]
         )
+        
         self.logger = logging.getLogger(__name__)
 
     def start_preview(self):
