@@ -102,7 +102,11 @@ class VideoRecorder:
                  external_storage_path="/media/samwhitehead/LaCie/buzzwatch_videos",
                  chunk_duration_minutes=20, 
                  transfer_interval_hours=12,
-                 show_preview=False):
+                 show_preview=False,
+                 resolution=(1920, 1080),
+                 bitrate=10000000,
+                 framerate=30,
+                 preview_size=(640, 480)):
         """
         Initialize the video recorder
         
@@ -112,13 +116,21 @@ class VideoRecorder:
             chunk_duration_minutes: Duration of each video chunk in minutes
             transfer_interval_hours: Hours between file transfers to external storage
             show_preview: Whether to show camera preview on connected display
+            resolution: Video resolution as (width, height) tuple
+            bitrate: Video bitrate in bits per second
+            framerate: Video framerate (fps)
+            preview_size: Preview window size as (width, height) tuple
         """
         self.local_storage_path = Path(local_storage_path)
         self.external_storage_path = Path(external_storage_path)
         self.chunk_duration = chunk_duration_minutes * 60  # Convert to seconds
         self.transfer_interval = transfer_interval_hours * 3600  # Convert to seconds
         self.show_preview = show_preview
-        
+        self.resolution = resolution
+        self.bitrate = bitrate
+        self.framerate = framerate
+        self.preview_size = preview_size
+
         # Create directories if they don't exist
         self.local_storage_path.mkdir(parents=True, exist_ok=True)
         self.external_storage_path.mkdir(parents=True, exist_ok=True)
@@ -128,7 +140,7 @@ class VideoRecorder:
         
         # Initialize camera
         self.camera = Picamera2()
-        self.encoder = H264Encoder(bitrate=10000000)  # 10 Mbps bitrate
+        self.encoder = H264Encoder(bitrate=self.bitrate)  # Use configurable bitrate
         
         # Threading control
         self.recording = False
@@ -190,8 +202,7 @@ class VideoRecorder:
                 
             # Now switch to video configuration for recording
             video_config = self.camera.create_video_configuration(
-                main={"size": (1920, 1080)},  # Full HD recording
-                raw={"size": (1920, 1080)}
+                main={"size": self.resolution, "format": "YUV420"},  # Use configurable resolution
             )
             self.camera.configure(video_config)
             self.camera.start()
@@ -385,28 +396,64 @@ class VideoRecorder:
 
 def main():
     parser = argparse.ArgumentParser(description='Continuous video recorder for Raspberry Pi')
+
+    # Storage settings
     parser.add_argument('--local-path', default='/home/samwhitehead/Videos',
                       help='Local storage path (default: /home/samwhitehead/Videos)')
     parser.add_argument('--external-path', default='/media/samwhitehead/LaCie/buzzwatch_videos',
                       help='External storage path (default: /media/samwhitehead/LaCie/buzzwatch_videos)')
+
+    # Recording settings
     parser.add_argument('--chunk-minutes', type=int, default=1,
-                      help='Video chunk duration in minutes (default: 1)')
-    parser.add_argument('--transfer-hours', type=int, default=0.05,
-                      help='Hours between transfers (default: 0.05)')
-    parser.add_argument('--preview', action='store_true',
-                      help='Show camera preview on connected display')
+                        help='Video chunk duration in minutes (default: 20)')
+    parser.add_argument('--resolution', default='1920x1080',
+                        help='Video resolution (default: 1920x1080). Options: 1920x1080, 1280x720, 640x480')
+    parser.add_argument('--bitrate', type=int, default=10000000,
+                        help='Video bitrate in bits per second (default: 10000000 = 10Mbps)')
+    parser.add_argument('--framerate', type=int, default=30,
+                        help='Video framerate (default: 30)')
+
+    # Transfer and cleanup settings
+    parser.add_argument('--transfer-hours', type=float, default=0.05,
+                        help='Hours between transfers (default: 12)')
     parser.add_argument('--cleanup-days', type=int, default=30,
-                      help='Days to keep old files (default: 30)')
-    
+                        help='Days to keep old files (default: 30)')
+
+    # Display settings
+    parser.add_argument('--preview', action='store_true',
+                        help='Show camera preview on connected display')
+    parser.add_argument('--preview-size', default='640x480',
+                        help='Preview window size (default: 640x480)')
+
     args = parser.parse_args()
-    
+
+    # Parse resolution
+    try:
+        width, height = map(int, args.resolution.split('x'))
+        resolution = (width, height)
+    except ValueError:
+        print(f"Invalid resolution format: {args.resolution}. Use format like 1920x1080")
+        return 1
+
+    # Parse preview size
+    try:
+        preview_width, preview_height = map(int, args.preview_size.split('x'))
+        preview_size = (preview_width, preview_height)
+    except ValueError:
+        print(f"Invalid preview size format: {args.preview_size}. Use format like 640x480")
+        return 1
+
     # Create recorder instance
     recorder = VideoRecorder(
         local_storage_path=args.local_path,
         external_storage_path=args.external_path,
         chunk_duration_minutes=args.chunk_minutes,
         transfer_interval_hours=args.transfer_hours,
-        show_preview=args.preview
+        show_preview=args.preview,
+        resolution=resolution,
+        bitrate=args.bitrate,
+        framerate=args.framerate,
+        preview_size=preview_size
     )
     
     try:
