@@ -211,7 +211,39 @@ class SeamlessVideoRecorder:
 
         # Final file transfer
         self.transfer_files()
+
+        # Copy log file to external storage
+        self.backup_log_file()
+
         self.logger.info("Seamless recording stopped")
+
+    def backup_log_file(self):
+        """Copy the log file to external storage"""
+        try:
+            if not self.external_storage_path.exists():
+                self.logger.warning("External storage not accessible - cannot backup log file")
+                return
+
+            if not self.log_path.exists():
+                self.logger.warning("Log file not found - nothing to backup")
+                return
+
+            # Create timestamped log filename for external storage
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            log_backup_name = f"video_recorder_{timestamp}.log"
+            log_destination = self.external_storage_path / log_backup_name
+
+            # Copy log file
+            shutil.copy2(self.log_path, log_destination)
+
+            # Verify the copy was successful
+            if log_destination.exists() and log_destination.stat().st_size == self.log_path.stat().st_size:
+                self.logger.info(f"Log file backed up to external storage: {log_backup_name}")
+            else:
+                self.logger.error("Log file backup verification failed")
+
+        except Exception as e:
+            self.logger.error(f"Failed to backup log file: {e}")
 
     def get_video_files(self):
         """Get list of completed video files"""
