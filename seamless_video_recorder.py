@@ -2,32 +2,6 @@
 """
 Seamless continuous video recorder using rpicam-vid
 Records with no gaps between chunks and manages file storage
-
-Error message:
-
-2025-08-07 15:30:34,002 - INFO - Starting seamless video recording with rpicam-vid
-2025-08-07 15:30:34,002 - INFO - Command: rpicam-vid -t 0 --segment 60000 -o /home/samwhitehead/Videos/video_20250807_153033_%04d.h264 --width 1920 --height 1080 --bitrate 10000000 --framerate 30 --codec h264 --inline --flush
-2025-08-07 15:30:35,988 - INFO - Camera preview started
-2025-08-07 15:30:35,988 - INFO - Seamless recording started - no gaps between chunks!
-2025-08-07 15:30:35,989 - ERROR - Recording process ended unexpectedly:
-2025-08-07 15:30:35,989 - ERROR - stdout: 
-2025-08-07 15:30:35,990 - ERROR - stderr: [0:51:01.657819812] [2130]  INFO Camera camera_manager.cpp:326 libcamera v0.5.1+100-e53bdf1f
-[0:51:01.674418471] [2138]  WARN CameraSensorProperties camera_sensor_properties.cpp:473 No static properties available for 'imx708_noir'
-[0:51:01.674458675] [2138]  WARN CameraSensorProperties camera_sensor_properties.cpp:475 Please consider updating the camera sensor properties database
-[0:51:01.687215906] [2138]  WARN RPiSdn sdn.cpp:40 Using legacy SDN tuning - please consider moving SDN inside rpi.denoise
-[0:51:01.689082704] [2138]  WARN CameraSensor camera_sensor_legacy.cpp:501 'imx708_noir': No sensor delays found in static properties. Assuming unverified defaults.
-[0:51:01.689878315] [2138]  INFO RPI vc4.cpp:440 Registered camera /base/soc/i2c0mux/i2c@1/imx708@1a to Unicam device /dev/media1 and ISP device /dev/media2
-[0:51:01.689931352] [2138]  INFO RPI pipeline_base.cpp:1107 Using configuration file '/usr/share/libcamera/pipeline/rpi/vc4/rpi_apps.yaml'
-Made X/EGL preview window
-[0:51:02.453081525] [2130]  INFO Camera camera.cpp:1011 Pipeline handler in use by another process
-ERROR: *** failed to acquire camera /base/soc/i2c0mux/i2c@1/imx708@1a ***
-
-2025-08-07 15:30:35,990 - INFO - Stopping seamless video recording
-2025-08-07 15:30:35,992 - INFO - Preview stopped
-2025-08-07 15:30:35,992 - ERROR - Error stopping recording process: [Errno 3] No such process
-2025-08-07 15:30:35,993 - INFO - No video files ready for transfer
-2025-08-07 15:30:35,993 - INFO - Seamless recording stopped
-
 """
 
 import os
@@ -44,8 +18,7 @@ from pathlib import Path
 
 
 class SeamlessVideoRecorder:
-    def __init__(self,
-                 local_storage_path="/home/samwhitehead/Videos",
+    def __init__(self, local_storage_path="/home/samwhitehead/Videos",
                  external_storage_path="/media/samwhitehead/LaCie/buzzwatch_videos",
                  chunk_duration_minutes=20,
                  transfer_interval_hours=12.0,
@@ -55,16 +28,6 @@ class SeamlessVideoRecorder:
                  framerate=30):
         """
         Initialize the seamless video recorder using rpicam-vid
-
-        Args:
-            local_storage_path: Path on SD card to store videos temporarily
-            external_storage_path: Path on external drive for long-term storage
-            chunk_duration_minutes: Duration of each video chunk in minutes
-            transfer_interval_hours: Hours between file transfers to external storage
-            show_preview: Whether to show camera preview on connected display
-            resolution: Video resolution as (width, height) tuple
-            bitrate: Video bitrate in bits per second
-            framerate: Video framerate (fps)
         """
         self.local_storage_path = Path(local_storage_path)
         self.external_storage_path = Path(external_storage_path)
@@ -96,7 +59,6 @@ class SeamlessVideoRecorder:
                 logging.StreamHandler()
             ]
         )
-        
         self.logger = logging.getLogger(__name__)
 
     def start_preview(self):
@@ -171,15 +133,17 @@ class SeamlessVideoRecorder:
             '--flush'  # Flush each segment immediately
         ]
 
-        # Add preview if not using separate preview window
-        if not self.show_preview:
-            record_cmd.extend(['--nopreview'])
+        # Add preview settings - rpicam-vid handles both recording and preview
+        if self.show_preview:
+            record_cmd.extend(['--preview', '0,0,640,480'])  # Show preview window
+        else:
+            record_cmd.extend(['--nopreview'])  # No preview
 
         try:
             self.logger.info("Starting seamless video recording with rpicam-vid")
             self.logger.info(f"Command: {' '.join(record_cmd)}")
 
-            # Start recording process
+            # Start recording process (handles both recording and preview in one process)
             self.recording_process = subprocess.Popen(
                 record_cmd,
                 stdout=subprocess.PIPE,
@@ -191,11 +155,10 @@ class SeamlessVideoRecorder:
             self.transfer_thread = threading.Thread(target=self.transfer_worker, daemon=True)
             self.transfer_thread.start()
 
-            # Start preview if requested
             if self.show_preview:
-                self.start_preview()
-
-            self.logger.info("Seamless recording started - no gaps between chunks!")
+                self.logger.info("Seamless recording started with built-in preview - no gaps between chunks!")
+            else:
+                self.logger.info("Seamless recording started - no gaps between chunks!")
 
             # Monitor the recording process
             while self.recording:
@@ -204,8 +167,10 @@ class SeamlessVideoRecorder:
                     # Process ended unexpectedly
                     stdout, stderr = self.recording_process.communicate()
                     self.logger.error(f"Recording process ended unexpectedly:")
-                    self.logger.error(f"stdout: {stdout.decode()}")
-                    self.logger.error(f"stderr: {stderr.decode()}")
+                    if stdout:
+                        self.logger.error(f"stdout: {stdout.decode()}")
+                    if stderr:
+                        self.logger.error(f"stderr: {stderr.decode()}")
                     break
 
                 # Check storage space
@@ -224,10 +189,7 @@ class SeamlessVideoRecorder:
         self.logger.info("Stopping seamless video recording")
         self.recording = False
 
-        # Stop preview
-        self.stop_preview()
-
-        # Stop recording process
+        # Stop recording process (this handles both recording and preview)
         if self.recording_process:
             try:
                 # Send SIGTERM to the process group
