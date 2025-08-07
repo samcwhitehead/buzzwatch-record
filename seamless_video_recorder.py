@@ -2,6 +2,32 @@
 """
 Seamless continuous video recorder using rpicam-vid
 Records with no gaps between chunks and manages file storage
+
+Error message:
+
+2025-08-07 15:30:34,002 - INFO - Starting seamless video recording with rpicam-vid
+2025-08-07 15:30:34,002 - INFO - Command: rpicam-vid -t 0 --segment 60000 -o /home/samwhitehead/Videos/video_20250807_153033_%04d.h264 --width 1920 --height 1080 --bitrate 10000000 --framerate 30 --codec h264 --inline --flush
+2025-08-07 15:30:35,988 - INFO - Camera preview started
+2025-08-07 15:30:35,988 - INFO - Seamless recording started - no gaps between chunks!
+2025-08-07 15:30:35,989 - ERROR - Recording process ended unexpectedly:
+2025-08-07 15:30:35,989 - ERROR - stdout: 
+2025-08-07 15:30:35,990 - ERROR - stderr: [0:51:01.657819812] [2130]  INFO Camera camera_manager.cpp:326 libcamera v0.5.1+100-e53bdf1f
+[0:51:01.674418471] [2138]  WARN CameraSensorProperties camera_sensor_properties.cpp:473 No static properties available for 'imx708_noir'
+[0:51:01.674458675] [2138]  WARN CameraSensorProperties camera_sensor_properties.cpp:475 Please consider updating the camera sensor properties database
+[0:51:01.687215906] [2138]  WARN RPiSdn sdn.cpp:40 Using legacy SDN tuning - please consider moving SDN inside rpi.denoise
+[0:51:01.689082704] [2138]  WARN CameraSensor camera_sensor_legacy.cpp:501 'imx708_noir': No sensor delays found in static properties. Assuming unverified defaults.
+[0:51:01.689878315] [2138]  INFO RPI vc4.cpp:440 Registered camera /base/soc/i2c0mux/i2c@1/imx708@1a to Unicam device /dev/media1 and ISP device /dev/media2
+[0:51:01.689931352] [2138]  INFO RPI pipeline_base.cpp:1107 Using configuration file '/usr/share/libcamera/pipeline/rpi/vc4/rpi_apps.yaml'
+Made X/EGL preview window
+[0:51:02.453081525] [2130]  INFO Camera camera.cpp:1011 Pipeline handler in use by another process
+ERROR: *** failed to acquire camera /base/soc/i2c0mux/i2c@1/imx708@1a ***
+
+2025-08-07 15:30:35,990 - INFO - Stopping seamless video recording
+2025-08-07 15:30:35,992 - INFO - Preview stopped
+2025-08-07 15:30:35,992 - ERROR - Error stopping recording process: [Errno 3] No such process
+2025-08-07 15:30:35,993 - INFO - No video files ready for transfer
+2025-08-07 15:30:35,993 - INFO - Seamless recording stopped
+
 """
 
 import os
@@ -336,10 +362,10 @@ def main():
     parser = argparse.ArgumentParser(description='Seamless video recorder using rpicam-vid')
 
     # Storage settings
-    parser.add_argument('--local-path', default='/home/pi/videos',
-                        help='Local storage path (default: /home/pi/videos)')
-    parser.add_argument('--external-path', default='/mnt/external_hdd/videos',
-                        help='External storage path (default: /mnt/external_hdd/videos)')
+    parser.add_argument('--local-path', default='/home/samwhitehead/Videos',
+                        help='Local storage path (default: /home/samwhitehead/Videos)')
+    parser.add_argument('--external-path', default='/media/samwhitehead/LaCie/buzzwatch_videos',
+                        help='External storage path (default: /media/samwhitehead/LaCie/buzzwatch_videos)')
 
     # Recording settings
     parser.add_argument('--chunk-minutes', type=int, default=20,
