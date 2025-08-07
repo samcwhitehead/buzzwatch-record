@@ -128,6 +128,7 @@ class SeamlessVideoRecorder:
             '--height', str(self.resolution[1]),
             '--bitrate', str(self.bitrate),
             '--framerate', str(self.framerate),
+            '--autofocus-mode', 'manual',  # Make this an input? Will also want to set --lens-position
             '--codec', 'h264',
             '--inline',  # Inline headers for better compatibility
             '--flush'  # Flush each segment immediately
@@ -211,11 +212,12 @@ class SeamlessVideoRecorder:
 
         # Final file transfer
         self.transfer_files()
-
+        
+        # Message about end of recording
+        self.logger.info("Seamless recording stopped")
+        
         # Copy log file to external storage
         self.backup_log_file()
-
-        self.logger.info("Seamless recording stopped")
 
     def backup_log_file(self):
         """Copy the log file to external storage"""
