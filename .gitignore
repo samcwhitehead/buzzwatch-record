@@ -3,3 +3,5 @@ bin/
 lib/
 .git/
 pyvenv.cfg
+.idea/
+*.bak
