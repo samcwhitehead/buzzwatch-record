@@ -19,7 +19,7 @@ from pathlib import Path
 
 class SeamlessVideoRecorder:
     def __init__(self, local_storage_path="/home/samwhitehead/Videos",
-                 external_storage_path="/media/samwhitehead/LaCie/buzzwatch_videos",
+                 external_storage_path="/media/samwhitehead/T7 Shield/buzzwatch_videos",
                  chunk_duration_minutes=20,
                  transfer_interval_hours=12.0,
                  show_preview=False,
@@ -48,7 +48,8 @@ class SeamlessVideoRecorder:
         self.recording = False
         self.transfer_thread = None
         self.last_transfer_time = time.time()
-
+        self.filename_timestamp = None
+        
         # Setup logging
         self.log_path = self.local_storage_path / Path('video_recorder.log')
         logging.basicConfig(
@@ -117,7 +118,8 @@ class SeamlessVideoRecorder:
         # Generate output filename pattern with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_pattern = str(self.local_storage_path / f"video_{timestamp}_%04d.h264")
-
+        self.filename_timestamp = timestamp  # store timestamp
+        
         # Build rpicam-vid command
         record_cmd = [
             'rpicam-vid',
@@ -231,7 +233,8 @@ class SeamlessVideoRecorder:
                 return
 
             # Create timestamped log filename for external storage
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            timestamp = self.filename_timestamp
             log_backup_name = f"video_recorder_{timestamp}.log"
             log_destination = self.external_storage_path / log_backup_name
 
@@ -360,8 +363,8 @@ def main():
     # Storage settings
     parser.add_argument('--local-path', default='/home/samwhitehead/Videos',
                         help='Local storage path (default: /home/samwhitehead/Videos)')
-    parser.add_argument('--external-path', default='/media/samwhitehead/LaCie/buzzwatch_videos',
-                        help='External storage path (default: /media/samwhitehead/LaCie/buzzwatch_videos)')
+    parser.add_argument('--external-path', default='/media/samwhitehead/T7 Shield/buzzwatch_videos',
+                        help='External storage path (default: /media/samwhitehead/T7 Shield/buzzwatch_videos)')
 
     # Recording settings
     parser.add_argument('--chunk-minutes', type=int, default=20,
