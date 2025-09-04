@@ -131,6 +131,7 @@ class SeamlessVideoRecorder:
             '--bitrate', str(self.bitrate),
             '--framerate', str(self.framerate),
             '--autofocus-mode', 'manual',  # Make this an input? Will also want to set --lens-position
+            '--lens-position', 5.0,  # In diopters, should be equivalent to 0.2 m
             '--codec', 'h264',
             '--inline',  # Inline headers for better compatibility
             '--flush'  # Flush each segment immediately
