@@ -131,7 +131,7 @@ class SeamlessVideoRecorder:
             '--bitrate', str(self.bitrate),
             '--framerate', str(self.framerate),
             '--autofocus-mode', 'manual',  # Make this an input? Will also want to set --lens-position
-            '--lens-position', '5.5',  # In diopters, should be equivalent to 0.2 m
+            '--lens-position', '6.5',  # In diopters, should be equivalent to 0.2 m
             '--shutter', '5000',  # I think in microseconds
             '--analoggain', '1.5',  # Combined analog and digital gain?
             '--codec', 'h264',
