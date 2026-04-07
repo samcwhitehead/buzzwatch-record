@@ -13,7 +13,7 @@ from datetime import datetime
 CONFIG_SCHEMA  = {
 
     "camera": {  # this dict for args that can be passed directly to rpicam as name/value pairs
-        "width": 1920,
+        "width": 1200,
         "height": 1080,
         "bitrate": 10000000,
         "framerate": 30,
