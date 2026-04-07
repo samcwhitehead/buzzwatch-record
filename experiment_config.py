@@ -32,7 +32,7 @@ CONFIG_SCHEMA  = {
         "external_path": "/media/samwhitehead/T7 Shield/buzzwatch_videos",
         "transfer_hours": 12.0,
         "cleanup_days": 30,
-        "file_ext": '.mp4',
+        "file_ext": '.h264',
     },
 
     # "display": {

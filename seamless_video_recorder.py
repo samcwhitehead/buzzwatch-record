@@ -359,7 +359,7 @@ class SeamlessVideoRecorder:
             cutoff_time = time.time() - (days_to_keep * 24 * 3600)
             old_files = []
 
-            for video_file in self.external_storage_path.glob("*.h264"):
+            for video_file in self.external_storage_path.glob(f"*{self.file_ext}"):
                 if video_file.stat().st_mtime < cutoff_time:
                     old_files.append(video_file)
 
