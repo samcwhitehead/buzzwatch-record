@@ -55,8 +55,10 @@ class SeamlessVideoRecorder:
 
         # Add experiment name to config and save as JSON
         self.config['storage']['folder_name'] = folder_name
-        config_path = self.local_storage_path / Path('expr_config.json')
-        ExperimentConfig.save(self.config, config_path)
+        ExperimentConfig.save(self.config,
+                              self.local_storage_path / Path('expr_config.json'))
+        ExperimentConfig.save(self.config,
+                              self.external_storage_path / Path('expr_config.json'))
 
         # Process control
         self.recording_process = None
