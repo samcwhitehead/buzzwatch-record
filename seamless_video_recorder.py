@@ -15,32 +15,48 @@ import signal
 import glob
 from datetime import datetime, timedelta
 from pathlib import Path
+from experiment_config import ExperimentConfig, ConfigManager
 
-
+#############################################################################################
+###################### MAIN CLASS ###########################################################
+#############################################################################################
 class SeamlessVideoRecorder:
-    def __init__(self, local_storage_path="/home/samwhitehead/Videos",
-                 external_storage_path="/media/samwhitehead/T7 Shield/buzzwatch_videos",
-                 chunk_duration_minutes=20,
-                 transfer_interval_hours=12.0,
-                 show_preview=False,
-                 resolution=(1920, 1080),
-                 bitrate=10000000,
-                 framerate=30):
+    def __init__(self,
+                 config_dict,
+                 show_preview=False):
         """
         Initialize the seamless video recorder using rpicam-vid
         """
-        self.local_storage_path = Path(local_storage_path)
-        self.external_storage_path = Path(external_storage_path)
-        self.chunk_duration_ms = chunk_duration_minutes * 60 * 1000  # Convert to milliseconds
-        self.transfer_interval = transfer_interval_hours * 3600  # Convert to seconds
+        # Store full config
+        self.config = config_dict
+
+        # Store whether to show preview
         self.show_preview = show_preview
-        self.resolution = resolution
-        self.bitrate = bitrate
-        self.framerate = framerate
+
+        # Extract commonly used values
+        rec = config_dict.get('recording', {})
+        storage = config_dict.get('storage', {})
+
+        self.local_storage_path_root = Path(storage.get('local_path'))
+        self.external_storage_path_root = Path(storage.get('external_path'))
+        self.chunk_duration_ms = rec.get('chunk_minutes', 20) * 60 * 1000
+        self.transfer_interval = storage.get('transfer_hours', 12.0) * 3600
+        self.file_ext = storage.get('file_ext')
+
+        # Generate name for the folders where data will be saved (both local and external)
+        # for now, just use datestr. can copy code from mosquito data transfer to add indices
+        folder_name = datetime.now().strftime('%Y%m%d')
+        self.local_storage_path = self.local_storage_path_root / folder_name
+        self.external_storage_path = self.external_storage_path_root / folder_name
 
         # Create directories
         self.local_storage_path.mkdir(parents=True, exist_ok=True)
         self.external_storage_path.mkdir(parents=True, exist_ok=True)
+
+        # Add experiment name to config and save as JSON
+        self.config['storage']['folder_name'] = folder_name
+        config_path = self.local_storage_path / Path('expr_config.json')
+        ExperimentConfig.save(self.config, config_path)
 
         # Process control
         self.recording_process = None
@@ -117,7 +133,7 @@ class SeamlessVideoRecorder:
 
         # Generate output filename pattern with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_pattern = str(self.local_storage_path / f"video_{timestamp}_%04d.h264")
+        output_pattern = str(self.local_storage_path / f"video_{timestamp}_%04d{self.file_ext}")
         self.filename_timestamp = timestamp  # store timestamp
         
         # Build rpicam-vid command
@@ -126,18 +142,14 @@ class SeamlessVideoRecorder:
             '-t', '0',  # Record indefinitely
             '--segment', str(self.chunk_duration_ms),  # Segment duration in milliseconds
             '-o', output_pattern,  # Output file pattern
-            '--width', str(self.resolution[0]),
-            '--height', str(self.resolution[1]),
-            '--bitrate', str(self.bitrate),
-            '--framerate', str(self.framerate),
-            '--autofocus-mode', 'manual',  # Make this an input? Will also want to set --lens-position
-            '--lens-position', '6.5',  # In diopters, should be equivalent to 0.2 m
-            '--shutter', '5000',  # I think in microseconds
-            '--analoggain', '1.5',  # Combined analog and digital gain?
-            '--codec', 'h264',
             '--inline',  # Inline headers for better compatibility
             '--flush'  # Flush each segment immediately
         ]
+
+        # add arguments that can be passed directly to rpicam
+        camera_config = self.config.get('camera', {})
+        for arg_name, arg_val in camera_config.items():
+            record_cmd.extend([f'--{arg_name}', str(arg_val)])
 
         # Add preview settings - rpicam-vid handles both recording and preview
         if self.show_preview:
@@ -360,27 +372,51 @@ class SeamlessVideoRecorder:
             self.logger.error(f"Error during cleanup: {e}")
 
 
+#############################################################################################
+###################### RUN ##################################################################
+#############################################################################################
 def main():
-    parser = argparse.ArgumentParser(description='Seamless video recorder using rpicam-vid')
+    # Create config dictionary populated with default vaules
+    config = ExperimentConfig.create_template()
+
+    # Parse user inputted arguments
+    parser = argparse.ArgumentParser(
+        description='Seamless video recorder using rpicam-vid',
+        epilog='Values not specified will use defaults from CONFIG_SCHEMA'
+    )
 
     # Storage settings
-    parser.add_argument('--local-path', default='/home/samwhitehead/Videos',
+    parser.add_argument('--local-path', default=None,
                         help='Local storage path (default: /home/samwhitehead/Videos)')
-    parser.add_argument('--external-path', default='/media/samwhitehead/T7 Shield/buzzwatch_videos',
+    parser.add_argument('--external-path', default=None,
                         help='External storage path (default: /media/samwhitehead/T7 Shield/buzzwatch_videos)')
+    parser.add_argument('--file_ext', type=str, default=None,
+                        help='Video file extension (default: MP4)')
+
+    # Camera settings
+    parser.add_argument('--width', default=None,
+                        help='Video width (default: 1920')
+    parser.add_argument('--height', default=None,
+                        help='Video height (default: 1080')
+    parser.add_argument('--bitrate', type=int, default=None,
+                        help='Video bitrate in bits per second (default: 10000000)')
+    parser.add_argument('--framerate', type=int, default=None,
+                        help='Video framerate (default: 30)')
+    parser.add_argument('--shutter', type=int, default=None,
+                        help='Camera shutter speed in microseconds(?) (see rpicam docs; default: 5000)')
+    parser.add_argument('--lens-position', type=float, default=None,
+                        help='Camera lens position in diopters (see rpicam docs; default: 6.5)')
+    parser.add_argument('--analoggain', type=float, default=None,
+                        help='Camera analog gain (see rpicam docs; default: 1.5)')
+    parser.add_argument('--autofocus-mode', type=str, default=None,
+                        help='Camera autofocus mode (see rpicam docs; default: manual)')
 
     # Recording settings
-    parser.add_argument('--chunk-minutes', type=int, default=20,
+    parser.add_argument('--chunk-minutes', type=int, default=None,
                         help='Video chunk duration in minutes (default: 20)')
-    parser.add_argument('--resolution', default='1920x1080',
-                        help='Video resolution (default: 1920x1080)')
-    parser.add_argument('--bitrate', type=int, default=10000000,
-                        help='Video bitrate in bits per second (default: 10000000)')
-    parser.add_argument('--framerate', type=int, default=30,
-                        help='Video framerate (default: 30)')
 
     # Transfer settings
-    parser.add_argument('--transfer-hours', type=float, default=12.0,
+    parser.add_argument('--transfer-hours', type=float, default=None,
                         help='Hours between transfers - can be decimal (default: 12.0)')
 
     # Preview settings
@@ -388,30 +424,29 @@ def main():
                         help='Show camera preview in separate window')
 
     # Cleanup settings
-    parser.add_argument('--cleanup-days', type=int, default=30,
+    parser.add_argument('--cleanup-days', type=int, default=None,
                         help='Days to keep old files (default: 30)')
 
-    args = parser.parse_args()
+    # args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
+    if len(unknown) > 0:
+        print(f'Warning: unknown arguments provided: {unknown}')
 
-    # Parse resolution
-    try:
-        width, height = map(int, args.resolution.split('x'))
-        resolution = (width, height)
-    except ValueError:
-        print(f"Invalid resolution: {args.resolution}")
-        return 1
+    # Overwrite default config settings with user input, if provided
+    config_keys_flat = list(ExperimentConfig.get_all_params(config).keys())
+    for arg_name, arg_val in vars(args).items():
+        if type(arg_val) is not bool and arg_val is not None:
+            # find the user-provided argument in config
+            flat_keys = [k for k in config_keys_flat if arg_name in k]
+            if not len(flat_keys) == 1:
+                print(f'Error: could not determine correct config value for {arg_name}')
+                return
+
+            # overwrite default value with the user-provided one
+            ConfigManager.set_value(config, flat_keys[0], arg_val)
 
     # Create recorder
-    recorder = SeamlessVideoRecorder(
-        local_storage_path=args.local_path,
-        external_storage_path=args.external_path,
-        chunk_duration_minutes=args.chunk_minutes,
-        transfer_interval_hours=args.transfer_hours,
-        show_preview=args.preview,
-        resolution=resolution,
-        bitrate=args.bitrate,
-        framerate=args.framerate
-    )
+    recorder = SeamlessVideoRecorder(config_dict=config)
 
     try:
         # Cleanup old files
